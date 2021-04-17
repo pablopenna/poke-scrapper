@@ -1,3 +1,11 @@
+# === CUSTOM ===
+settings.json
+# Ignore locally donwloaded files
+img/*
+# exception to keep the folder
+!img/.gitkeep 
+# ==============
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
