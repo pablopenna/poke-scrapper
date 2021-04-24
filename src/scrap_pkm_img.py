@@ -9,12 +9,15 @@ import argparse # lib for parsing command parameters
 import os # to get file path and be able to store images always in the img/ folder
 
 import boto3
+from boto3.dynamodb.conditions import Key, Attr # Querying and scanning
 
 #SPRITE_NAME_PATTERN='Spr {isBacksprite} {generation}{title} {pokenumber}{modifiers} {isShiny}.png'
 #SPRITE_NAME_REGEXP='Spr( b)?( [0-9]+)([a-z]+)( [0-9]+)([A-Z]+)?( s)?.png'
 SPRITE_URL_PREFIX='//cdn.bulbagarden.net/upload/9/9d/'
 SPRITE_URL_PATTERN='Spr{isBacksprite}_{generation}{title}_{dexNumber}{modifiers}{gender}{isShiny}.png'
 SPRITE_URL_REGEXP=re.compile('.*Spr(_b)?(_[0-9]+)([a-z]+)(_[0-9]+)([A-Z]+)?(_[mf])?(_s)?.png')
+
+IMAGE_DATA_PREFIX='data:image/png;base64,'
 
 ###
 # AWS TABLE SETUP AND METHODS
@@ -47,6 +50,24 @@ def writeSpriteBatchToDB(spriteDataArray):
     with table.batch_writer() as batch:
         for i in range(len(spriteDataArray)):
             batch.put_item(Item=spriteDataArray[i])
+
+def getPokemonSpritesFromDB(pokeName):
+    table = setupAwsTable()
+    lastEvaluatedKey = -1
+    retrievedSprites = []
+    while lastEvaluatedKey != None:
+        if lastEvaluatedKey == -1 :
+            response = table.query(
+                KeyConditionExpression=Key('name').eq(pokeName)
+            )
+        else:
+            response = table.query(
+                KeyConditionExpression=Key('name').eq(pokeName),
+                ExclusiveStartKey=lastEvaluatedKey
+            )
+        retrievedSprites += response['Items']
+        lastEvaluatedKey = response['LastEvaluatedKey'] if 'LastEvaluatedKey' in response.keys() else None
+    return retrievedSprites
 
 ###
 # POKE SPRITES SCRAPPING
@@ -146,6 +167,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("scrap-poke-image")
     parser.add_argument("pokemon_name", help="Name of the Pokémon to get its sprites", type=str)
     args = parser.parse_args()
-    spriteData = getPokemonSprites(args.pokemon_name)
-    # print("sprite data: {}".format(spriteData))
-    writeSpriteBatchToDB(spriteData)
+    writeSprite = False
+    if writeSprite:
+        spriteData = getPokemonSprites(args.pokemon_name)
+        #print("sprite data: {}".format(spriteData))
+        writeSpriteBatchToDB(spriteData)
+    else:
+        #res = getSpriteFromDB({'name': 'Charizard', 'index': 10})
+        #res['sprite']=IMAGE_DATA_PREFIX+res['sprite'].__str__().decode('ascii')
+        res = getPokemonSpritesFromDB(args.pokemon_name)
+        print(res)
