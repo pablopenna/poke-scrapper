@@ -1,0 +1,4 @@
+
+class spriteDAOOrchestrator:
+    dbSpriteDao = ""
+    fileSpriteDao = ""
